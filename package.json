@@ -4,7 +4,8 @@
   "description": "Task Timer & Tracker",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-packager . \"Task Timer\" --platform=win32 --arch=x64 --out=release-builds --overwrite --icon=icon.ico"
   },
   "keywords": [],
   "author": "",
