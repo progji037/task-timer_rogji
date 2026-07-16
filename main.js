@@ -1,10 +1,14 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
+// データの保存先（UserData）を以前の開発環境（task-timer）に固定し、記録を引き継げるようにする
+app.setPath('userData', path.join(app.getPath('appData'), 'task-timer'));
+
+let win;
 function createWindow () {
-  const win = new BrowserWindow({
-    width: 420,
-    height: 600,
+  win = new BrowserWindow({
+    width: 380,
+    height: 650,
     autoHideMenuBar: true, // メニューバーを隠してすっきりさせる
     alwaysOnTop: true, // 常に最前面に表示する
     icon: path.join(__dirname, 'icon.png'),
@@ -34,8 +38,9 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
+ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
+

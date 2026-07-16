@@ -1,0 +1,15 @@
+
+> task-timer@1.0.0 start
+> electron .
+
+
+[17812:0401/004233.721:WARNING:content\browser\btm\btm_database.cc:128] Failed to initialize the DIPS SQLite database.
+[17812:0401/004233.728:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: アクセスが拒否されました。 (0x5)
+[17812:0401/004233.728:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: アクセスが拒否されました。 (0x5)
+[17812:0401/004233.728:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: アクセスが拒否されました。 (0x5)
+[17812:0401/004233.730:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17812:0401/004233.730:ERROR:gpu\ipc\host\gpu_disk_cache.cc:725] Gpu Cache Creation failed: -2
+[17812:0401/004233.742:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17812:0401/004233.742:ERROR:gpu\ipc\host\gpu_disk_cache.cc:725] Gpu Cache Creation failed: -2
+[17812:0401/004233.743:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17812:0401/004233.743:ERROR:gpu\ipc\host\gpu_disk_cache.cc:725] Gpu Cache Creation failed: -2

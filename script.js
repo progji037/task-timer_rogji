@@ -1,9 +1,13 @@
+const { ipcRenderer } = require('electron');
+
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
     const categorySelect = document.getElementById('category-select');
     const manageCategoriesBtn = document.getElementById('manage-categories-btn');
     const taskInput = document.getElementById('task-input');
-    const taskList = document.getElementById('task-list');
+    const taskSuggestions = document.getElementById('task-suggestions');
+    const taskHistoryBtn = document.getElementById('task-history-btn');
+    const taskHistoryList = document.getElementById('task-history-list');
     const timeDisplay = document.getElementById('time-display');
     const setMinutesInput = document.getElementById('set-minutes');
     const setSecondsInput = document.getElementById('set-seconds');
@@ -11,10 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('start-btn');
     const pauseBtn = document.getElementById('pause-btn');
     const resetBtn = document.getElementById('reset-btn');
+    const dayStartTimeInput = document.getElementById('day-start-time');
     
     // Tabs Elements
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
+    const tabBtns = document.querySelectorAll('.stats-section .tab-btn');
+    const tabContents = document.querySelectorAll('.stats-section .tab-content');
 
     const dateInput = document.getElementById('date-input');
     const monthInput = document.getElementById('month-input');
@@ -71,11 +76,37 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPlaying = false;
     
     // Load records and categories from LocalStorage
-    let records = JSON.parse(localStorage.getItem('timerRecords')) || [];
-    let defaultCategories = ['未分類', '仕事', '学習', 'その他'];
-    let userCategories = JSON.parse(localStorage.getItem('timerCategories')) || defaultCategories;
+    let records = [];
+    let userCategories = ['未分類', '仕事', '学習', 'その他'];
+    let availableTasks = [];
+    try {
+        const parsedRecords = JSON.parse(localStorage.getItem('timerRecords'));
+        if (Array.isArray(parsedRecords)) records = parsedRecords;
+        
+        const parsedCats = JSON.parse(localStorage.getItem('timerCategories'));
+        if (Array.isArray(parsedCats)) userCategories = parsedCats;
+    } catch (e) {
+        console.error("Failed to parse LocalStorage data:", e);
+    }
 
     // Initialization
+    const savedDayStart = localStorage.getItem('dayStartHour');
+    if (savedDayStart !== null && dayStartTimeInput) {
+        dayStartTimeInput.value = savedDayStart;
+    }
+    if (dayStartTimeInput) {
+        dayStartTimeInput.addEventListener('change', () => {
+            let val = parseInt(dayStartTimeInput.value);
+            if (isNaN(val) || val < 0 || val > 23) {
+                val = 0;
+                dayStartTimeInput.value = 0;
+            }
+            localStorage.setItem('dayStartHour', val);
+            initDateInputs();
+            updateDashboard();
+        });
+    }
+
     initDateInputs();
     updateDisplay();
     populateCategorySelects();
@@ -181,9 +212,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Main Tabs Logic
+    const mainTabTimer = document.getElementById('main-tab-timer');
+    const mainTabStats = document.getElementById('main-tab-stats');
+    const sectionTimer = document.getElementById('section-timer');
+    const sectionStats = document.getElementById('section-stats');
+
+    if (mainTabTimer && mainTabStats) {
+        mainTabTimer.addEventListener('click', () => {
+            mainTabTimer.classList.add('active');
+            mainTabStats.classList.remove('active');
+            sectionTimer.style.display = 'block';
+            sectionStats.style.display = 'none';
+        });
+
+        mainTabStats.addEventListener('click', () => {
+            mainTabStats.classList.add('active');
+            mainTabTimer.classList.remove('active');
+            sectionStats.style.display = 'block';
+            sectionTimer.style.display = 'none';
+            updateDashboard(); // 集計タブを開いた時に集計を更新
+        });
+    }
+
     dateInput.addEventListener('change', updateDashboard);
     monthInput.addEventListener('change', updateDashboard);
     if (historyMonthInput) historyMonthInput.addEventListener('change', updateDashboard);
+
 
     // Modal Event Listener
     alarmStopBtn.addEventListener('click', () => {
@@ -224,6 +279,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Helpers
+    function getBusinessDate(dateObj) {
+        let d = new Date(dateObj);
+        const dayStartHour = parseInt(dayStartTimeInput ? dayStartTimeInput.value : 0) || 0;
+        d.setHours(d.getHours() - dayStartHour);
+        return d;
+    }
+
     function updateDisplay() {
         let m = Math.floor(remainingTime / 60);
         let s = remainingTime % 60;
@@ -340,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set initial dates to current date
     function initDateInputs() {
-        const now = new Date();
+        const now = getBusinessDate(new Date());
         const y = now.getFullYear();
         const m = (now.getMonth() + 1).toString().padStart(2, '0');
         const d = now.getDate().toString().padStart(2, '0');
@@ -349,15 +411,143 @@ document.addEventListener('DOMContentLoaded', () => {
         if (historyMonthInput) historyMonthInput.value = `${y}-${m}`;
     }
 
-    // Dynamically update HTML datalist for autocomplete
+    // Custom Autocomplete Logic
+
     function updateTaskSuggestions() {
-        const tasks = [...new Set(records.map(r => r.taskName).filter(Boolean))];
-        taskList.innerHTML = '';
-        tasks.sort().forEach(t => {
-            const option = document.createElement('option');
-            option.value = t;
-            taskList.appendChild(option);
+        if (!Array.isArray(records)) return;
+        availableTasks = [...new Set(records.map(r => r ? r.taskName : '').filter(Boolean))].sort();
+    }
+
+    function renderTaskSuggestions(query = '') {
+        taskSuggestions.innerHTML = '';
+        const lowerQuery = query.toLowerCase();
+        const filteredTasks = availableTasks.filter(t => t.toLowerCase().includes(lowerQuery));
+        
+        if (filteredTasks.length === 0) {
+            taskSuggestions.style.display = 'none';
+            return;
+        }
+
+        filteredTasks.forEach(t => {
+            const li = document.createElement('li');
+            li.textContent = t;
+            li.addEventListener('mousedown', (e) => {
+                // Blurの前に発火させるためにmousedownを使用
+                e.preventDefault();
+                taskInput.value = t;
+                taskSuggestions.style.display = 'none';
+            });
+            taskSuggestions.appendChild(li);
         });
+        taskSuggestions.style.display = 'block';
+    }
+
+    function renderTaskHistoryList() {
+        if (!taskHistoryList) return;
+        taskHistoryList.innerHTML = '';
+        
+        if (!Array.isArray(records) || records.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = '履歴がありません';
+            li.style.color = 'var(--text-secondary)';
+            li.style.pointerEvents = 'none';
+            taskHistoryList.appendChild(li);
+        } else {
+            // Get last 15 unique task names from latest records
+            const sortedRecords = [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
+            const recentTasksIter = sortedRecords.map(r => r.taskName).filter(Boolean);
+            const uniqueRecent = [...new Set(recentTasksIter)].slice(0, 15);
+
+            uniqueRecent.forEach(t => {
+                const li = document.createElement('li');
+                li.textContent = t;
+                li.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    taskInput.value = t;
+                    taskHistoryList.style.display = 'none';
+                    // もしサジェストも表示されていたら消す
+                    if (taskSuggestions) taskSuggestions.style.display = 'none';
+                });
+                taskHistoryList.appendChild(li);
+            });
+        }
+        
+        taskHistoryList.style.display = 'block';
+        if (taskSuggestions) taskSuggestions.style.display = 'none'; // hide autocomplete
+    }
+
+    // Toggle history list
+    if (taskHistoryBtn) {
+        taskHistoryBtn.addEventListener('mousedown', (e) => {
+            // Prevent input blur
+            e.preventDefault();
+        });
+        taskHistoryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (taskHistoryList.style.display === 'block') {
+                taskHistoryList.style.display = 'none';
+            } else {
+                renderTaskHistoryList();
+            }
+        });
+
+        // Hide when clicking outside
+        document.addEventListener('mousedown', (e) => {
+            if (taskHistoryList && taskHistoryList.style.display === 'block') {
+                if (!taskHistoryList.contains(e.target) && e.target !== taskHistoryBtn) {
+                    taskHistoryList.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    // Input events for autocomplete
+    taskInput.addEventListener('focus', () => {
+        if (availableTasks.length > 0) {
+            renderTaskSuggestions(taskInput.value);
+        }
+    });
+
+    taskInput.addEventListener('input', () => {
+        renderTaskSuggestions(taskInput.value);
+    });
+
+    taskInput.addEventListener('blur', () => {
+        taskSuggestions.style.display = 'none';
+    });
+
+    // キーボード操作対応
+    taskInput.addEventListener('keydown', (e) => {
+        const items = taskSuggestions.querySelectorAll('li');
+        if (taskSuggestions.style.display === 'none' || items.length === 0) return;
+
+        let currentIndex = Array.from(items).findIndex(item => item.classList.contains('selected'));
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            currentIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+            updateSelection(items, currentIndex);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            currentIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+            updateSelection(items, currentIndex);
+        } else if (e.key === 'Enter') {
+            if (currentIndex >= 0 && currentIndex < items.length) {
+                e.preventDefault();
+                taskInput.value = items[currentIndex].textContent;
+                taskSuggestions.style.display = 'none';
+            }
+        } else if (e.key === 'Escape') {
+            taskSuggestions.style.display = 'none';
+        }
+    });
+
+    function updateSelection(items, index) {
+        items.forEach(item => item.classList.remove('selected'));
+        if (index >= 0 && items[index]) {
+            items[index].classList.add('selected');
+            items[index].scrollIntoView({ block: 'nearest' });
+        }
     }
 
     function populateCategorySelects() {
@@ -544,13 +734,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (currentEditTimeContext.reportType === 'daily') {
                         const d = new Date(currentEditTimeContext.filterVal);
                         if (!isNaN(d.getTime())) {
-                            d.setHours(12, 0, 0, 0);
+                            const dayStartHour = parseInt(dayStartTimeInput ? dayStartTimeInput.value : 0) || 0;
+                            d.setHours(12 + dayStartHour, 0, 0, 0);
                             adjustmentDateStr = d.toISOString();
                         }
                     } else if (currentEditTimeContext.reportType === 'monthly') {
                         const parts = currentEditTimeContext.filterVal.split('-');
                         if (parts.length === 2) {
-                            const d = new Date(parts[0], parseInt(parts[1]) - 1, 1, 12, 0, 0);
+                            const dayStartHour = parseInt(dayStartTimeInput ? dayStartTimeInput.value : 0) || 0;
+                            const d = new Date(parts[0], parseInt(parts[1]) - 1, 1, 12 + dayStartHour, 0, 0);
                             adjustmentDateStr = d.toISOString();
                         }
                     }
@@ -580,15 +772,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Render stats and history
     function updateDashboard() {
-        const activeTabBtn = document.querySelector('.tab-btn.active');
-        const reportType = activeTabBtn ? activeTabBtn.dataset.tab : 'daily';
+        const activeTabBtn = document.querySelector('.stats-section .tab-btn.active');
+        const reportType = activeTabBtn && activeTabBtn.dataset.tab ? activeTabBtn.dataset.tab : 'daily';
         let filteredRecords = [];
 
         if (reportType === 'daily') {
             const selectedDate = dateInput.value; // Format: "YYYY-MM-DD"
             if (!selectedDate) return;
             filteredRecords = records.filter(r => {
-                const d = new Date(r.date);
+                const d = getBusinessDate(r.date);
                 const y = d.getFullYear();
                 const m = (d.getMonth() + 1).toString().padStart(2, '0');
                 const day = d.getDate().toString().padStart(2, '0');
@@ -598,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedMonth = monthInput.value; // Format: "YYYY-MM"
             if (!selectedMonth) return;
             filteredRecords = records.filter(r => {
-                const d = new Date(r.date);
+                const d = getBusinessDate(r.date);
                 const y = d.getFullYear();
                 const m = (d.getMonth() + 1).toString().padStart(2, '0');
                 return `${y}-${m}` === selectedMonth;
@@ -607,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedHistoryMonth = historyMonthInput ? historyMonthInput.value : '';
             if (!selectedHistoryMonth) return;
             filteredRecords = records.filter(r => {
-                const d = new Date(r.date);
+                const d = getBusinessDate(r.date);
                 const y = d.getFullYear();
                 const m = (d.getMonth() + 1).toString().padStart(2, '0');
                 return `${y}-${m}` === selectedHistoryMonth;
@@ -658,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (reportType === 'monthly') {
             const dailyStats = {};
             filteredRecords.forEach(r => {
-                const d = new Date(r.date);
+                const d = getBusinessDate(r.date);
                 const dayStr = `${d.getMonth() + 1}月${d.getDate()}日`;
                 if (!dailyStats[dayStr]) dailyStats[dayStr] = 0;
                 dailyStats[dayStr] += r.duration;
@@ -937,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const filteredRecords = records.filter(r => {
-                const d = new Date(r.date);
+                const d = getBusinessDate(r.date);
                 const y = d.getFullYear();
                 const m = (d.getMonth() + 1).toString().padStart(2, '0');
                 return `${y}-${m}` === selectedMonth;
@@ -993,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function isRecordInCurrentFilter(r, filter) {
-            const d = new Date(r.date);
+            const d = getBusinessDate(r.date);
             const y = d.getFullYear();
             const m = (d.getMonth() + 1).toString().padStart(2, '0');
             if (filter.type === 'daily') {

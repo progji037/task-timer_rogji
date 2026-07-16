@@ -1,0 +1,20 @@
+
+> task-timer@1.0.0 start
+> electron .
+
+
+[1496:0401/003643.199:WARNING:content\browser\btm\btm_database.cc:128] Failed to initialize the DIPS SQLite database.
+[1496:0401/003643.206:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: アクセスが拒否されました。 (0x5)
+[1496:0401/003643.206:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: アクセスが拒否されました。 (0x5)
+[1496:0401/003643.206:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: アクセスが拒否されました。 (0x5)
+[1496:0401/003643.207:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[1496:0401/003643.207:ERROR:gpu\ipc\host\gpu_disk_cache.cc:725] Gpu Cache Creation failed: -2
+[1496:0401/003643.213:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[1496:0401/003643.213:ERROR:gpu\ipc\host\gpu_disk_cache.cc:725] Gpu Cache Creation failed: -2
+[1496:0401/003643.213:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[1496:0401/003643.213:ERROR:gpu\ipc\host\gpu_disk_cache.cc:725] Gpu Cache Creation failed: -2
+
+C:\Users\asd04\Desktop\timer>'d' is not recognized as an internal or external command,
+operable program or batch file.
+
+C:\Users\asd04\Desktop\timer>
